@@ -44,6 +44,7 @@ for(package.i in list.of.packages){
   )
 }
 
+
 # -------------------------------------------------------------------------
 # Input and Output Directory Management
 # -------------------------------------------------------------------------
@@ -54,26 +55,25 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # Set Source File Directory as Working Directory
 working_dir <- getwd()
 
-output_dir <- paste(dirname(working_dir), "/outputs/cr_pars_pnw", sep = "")
-input_dir <- paste(dirname(working_dir), "/data/", sep = "")
-output_dir
-input_dir
-# -------------------------------------------------------------------------
-# Input Loading
-# -------------------------------------------------------------------------
+inputs <- "/agc_test"
+outputs <- "/cr_pars_pnw"
 
-# -------------------------------------------------------------------------
-# Data Processing - Single Worker
-# -------------------------------------------------------------------------
+input_dir <- paste(dirname(working_dir), "/data/inputs", inputs, sep = "")
+output_dir <- paste(dirname(working_dir), "data/outputs", outputs, sep = "")
 
+
+# ------------------------------------------------------------------------------
+# Define Functions
+# ------------------------------------------------------------------------------
+
+# Defines the Chapman Richards Function
+chapman_richards <- function(t, A, K, B, m) {
+  return(A * (1 - (B * exp(-K * t)))^(1/(1-m)))
+}
 
 
 calc_cr <- function(id){
-  # Defines the Chapman Richards Function
-  chapman_richards <- function(t, A, K, B, m) {
-    return(A * (1 - (B * exp(-K * t)))^(1/(1-m)))
-  }
-  
+
   file_name = paste("agc_", id,"_age_", sep="")
   max_file_name <- paste("agc_pot_", id, ".tif", sep="")
   max_pot_path <- paste(input_dir, max_file_name, sep="")
