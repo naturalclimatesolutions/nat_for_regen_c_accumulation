@@ -22,7 +22,9 @@
 list.of.packages <- c("terra",
                       "tidyverse",
                       "parallel",
-                      "doParallel")
+                      "doParallel",
+                      "foreach",
+                      "tictoc")
 
 # Check If Any Packages Neeed Installing
 new.packages <-
@@ -50,6 +52,8 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # Set Source File Directory as Working Directory
 working_dir <- getwd()
 
+log_file <- file.path(working_dir, "progress_log.txt")
+file.create(log_file)
 inputs <- "agc_5_deg"
 outputs <- "cr_pars_5_deg"
 id_prefix <- "grd_"
@@ -130,6 +134,9 @@ fit_nls <-
   }
 
 calc_cr <- function(id) {
+  log_freq <- 5
+  last_logged_perc <- 0
+  
   ages = seq(5, 100, by = 5)
   age_ch = as.character(ages)
   input_files <- get_input_files(id, age_ch)
@@ -255,7 +262,13 @@ calc_cr <- function(id) {
     b_error_rast[j] <- B_error
     cnv_rast[j] <- cnv_val
     
-    setTxtProgressBar(pb, j)
+    current_perc <- (j / n_pixels) * 100
+    if (current_perc - last_logged_perc >= log_freq) {
+      cat(sprintf("Grid ID %s: %d%% Complete\n", id, round(current_perc)), 
+          file = log_file, append = TRUE)
+      last_logged_perc <- current_perc # Update the last logged percentage
+    }
+    # setTxtProgressBar(pb, j)
   }
   
   a_name = paste('A_grd_', id, '.tif', sep = "")
@@ -281,36 +294,76 @@ calc_cr <- function(id) {
   writeRaster(k_error_rast, k_e_name,  gdal = c("COMPRESS=DEFLATE"))
   writeRaster(b_error_rast, b_e_name,  gdal = c("COMPRESS=DEFLATE"))
   writeRaster(cnv_rast, cnv_name,  gdal = c("COMPRESS=DEFLATE"))
+  log_entry <- sprintf("Grid ID %s: Processing Complete\n", id)
+  write(log_entry, file = log_file, append = TRUE)
 }
 
-system.time(calc_cr('79'))
+# system.time(calc_cr('79'))
+
+inputs <- list.files(paste(input_dir, "/agc_valid", sep = ""))
+grid_ids <- regmatches(inputs, regexpr("\\d+", inputs))
+
+completed <- list.files(paste(output_dir, "/A", sep = ""))
+completed_grids <-
+  unique(regmatches(completed, regexpr("\\d+", completed)))
+
+to_do <- setdiff(grid_ids, completed_grids)
+length(to_do)
+to_do_valid <- vector() 
+
+for(i in 1:length(to_do)){
+  id <- to_do[i]
+  valid_pixels_name <-
+    paste(input_dir,
+          "/agc_valid/valid_agc_",
+          id_prefix,
+          id,
+          ".tif",
+          sep = "")
+  rast <- rast(valid_pixels_name)
+  setMinMax(rast)
+  test <- minmax(rast, compute=FALSE)[2,1]
+  if (test == 1){
+    to_do_valid[i] <- id
+  }
+}
+
+to_do_valid <- to_do_valid[!is.na(to_do_valid)]
+length(to_do_valid)
+to_do_valid
+start_grid <- 1
+end_grid <- 100
+
+g_ids <- to_do_valid[start_grid:end_grid]
+grid_log <- sprintf("Grids: %s", g_ids)
+write(grid_log, file = log_file, append = TRUE)
 
 
-# # inputs <- list.files(paste(dirname(working_dir), "/data/", 'agc_5_deg', sep = ""), pattern="agc_pot_grd")
-# # grid_ids <- regmatches(inputs, regexpr( "\\d+", inputs))
-# #
-# # completed <- list.files(paste(dirname(working_dir), "/outputs/to_upload/uploaded/A", sep = ""))
-# # completed_grids <- unique(regmatches(completed, regexpr( "\\d+", completed)))
-# # completed_grids
-# # length(completed_grids)
-# # to_do <- setdiff(grid_ids, completed_grids)
-# # length(to_do)
-# # to_do
-# # start_grid <- 1
-# # end_grid <- 24
-# # g_ids <- to_do[start_grid:end_grid]
-# # length(g_ids)
-# # sort(g_ids)
-# # cl <- makeCluster(12)
-# # registerDoParallel(cl)
-# # clusterExport(cl,list('calc_cr'))
-# # clusterEvalQ(cl, library("terra"))
-# # system.time(
-# #   parLapply(cl, g_ids, fun=calc_cr)
-# # )
-# #
-# # parallel::stopCluster(cl = cl)
-# # rm(list=ls(all.names=TRUE))
-# # gc()
-#
-#
+cl <- makeCluster(22)
+registerDoParallel(cl)
+clusterExport(
+  cl,
+  list(
+    'calc_cr',
+    'inputs',
+    'outputs',
+    'id_prefix',
+    'input_dir',
+    'output_dir',
+    'chapman_richards',
+    'get_input_files',
+    'fit_nls',
+    'log_file'
+  )
+)
+clusterEvalQ(cl, library("terra"))
+
+tic()
+  foreach(id = g_ids, .packages = c("terra")) %dopar% {
+  calc_cr(id)
+}
+toc()
+
+parallel::stopCluster(cl = cl)
+rm(list = ls(all.names = TRUE))
+gc()
