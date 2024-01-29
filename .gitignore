@@ -40,3 +40,5 @@ vignettes/*.pdf
 cr_calc/data/
 
 cr_calc/R/.RDataTmp
+
+cr_calc/R/progress_log.txt
