@@ -41,7 +41,7 @@ borneo_pars <- list(A = 121.1739, K = 0.026406, C = 0.95896)
 
 
 crResults <- function(ee_points, heinrich_pars, location) {
-  ages <- seq(1, 200, 1)
+  ages <- seq(1, 100, 1)
   chapman_richards_ee <- function(t, A, K, B, m) {
     return(A * (1 - (B * exp(-K * t))) ^ (1 / (1 - m)))
   }
@@ -84,17 +84,29 @@ crResults <- function(ee_points, heinrich_pars, location) {
   
   heinrich_est <- output[output$id == 'val',]
   ee_est <- output[output$id != 'val',]
+  ee_est <- ee_est[complete.cases(ee_est), ]
+  
+  mean_agc_data <- ee_est %>%
+    group_by(age) %>%
+    summarise(mean_agc = mean(agc), .groups = 'drop')
+  mean_agc_data$id = 'Mean'
+  print(head(mean_agc_data))
+  # mean_agc_data <- mutate(mean_agc_data, line_type = "Mean")
+  
   p <- ggplot(ee_est, aes(x = age, y = agc, group = id)) +
     geom_line(aes(color = "Pixel Estimates"),
               alpha = 0.05,
               linewidth = 0.5) +  # Adjust alpha for better visibility if necessary
+    geom_line(data = mean_agc_data,
+              aes(x = age, y = mean_agc, color = "Region Means"),
+              linewidth = 1) +
     geom_line(data = heinrich_est,
               aes(x = age, y = agc, color = "Heinrich et al."),
               linewidth = 1) +
     geom_line(data = rmse,
               aes(x = age, y = rmse, color = "RMSE"),
               linewidth = 1) +
-    # theme_minimal() +
+    theme_minimal() +
     theme(
       legend.title = element_blank(),
       legend.position = c(0.05, 0.95),
@@ -107,6 +119,7 @@ crResults <- function(ee_points, heinrich_pars, location) {
     scale_color_manual(
       values = c(
         "Pixel Estimates" = "darkolivegreen4",
+        "Region Means" = "black",
         "Heinrich et al." = "darkorange3",
         "RMSE" = "firebrick"
       )
@@ -128,3 +141,4 @@ amazonResults <- crResults(amazon, amazon_pars, "Amazon Forests")
 amazonResults
 borneoResults <- crResults(borneo, borneo_pars, "Borneo Forests")
 borneoResults
+
