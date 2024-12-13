@@ -1,0 +1,544 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var a = ee.Image("projects/ee-groa-carbon-accumulation/assets/cr_pars/a"),
+    b = ee.Image("projects/ee-groa-carbon-accumulation/assets/cr_pars/b"),
+    k = ee.Image("projects/ee-groa-carbon-accumulation/assets/cr_pars/k"),
+    walker = ee.Image("projects/ee-groa-carbon-accumulation/assets/agc-max/pot_agc_mgha"),
+    rmf = ee.Image("projects/ee-groa-carbon-accumulation/assets/validation/Root_mass_fraction_Map_Merged"),
+    mo = ee.Image("projects/ee-groa-carbon-accumulation/assets/validation/Full_TGB_potential_Map_ensembled_mean_merged"),
+    cp_pot = ee.Image("projects/ee-groa-carbon-accumulation/assets/reforestation_potential/CP_2021"),
+    amz = ee.FeatureCollection("projects/ee-groa-carbon-accumulation/assets/validation/amazon_basin"),
+    countries = ee.FeatureCollection("USDOS/LSIB_SIMPLE/2017"),
+    geometry = /* color: #d63000 */ee.Geometry.Point([-83.98830978005707, 9.922126876640577]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var proj = a.projection();
+var scale = proj.nominalScale();
+var ecoregionImg = ee.Image("projects/SCL/v1/source/resolve-ecoregion-img");
+
+var reforestation = ecoregionImg.select(0).eq(ee.Image([1,12,2,3,4,5,6,8,7]))
+  .reduce(ee.Reducer.max())
+  .selfMask();
+  
+var biomes = ecoregionImg.select(0).updateMask(reforestation).int();
+var ecoregions = ecoregionImg.select(1).updateMask(reforestation).int()
+
+var forestBiomes = biomes.eq(ee.Image([1,2,3,4,5,12])).reduce(ee.Reducer.max())
+  .selfMask();
+
+
+var gBounds = ee.Geometry.Polygon([-180, 88, 0, 88, 180, 88, 180, -88, 0, -88, -180, -88], null, false);
+
+var ids = [];
+var bands = [];
+var ages = [];
+var ageIds = [];
+
+for(var i = 5; i<=100; i+=5){
+  var id = i.toString()
+  var path = "projects/ee-groa-carbon-accumulation/assets/agc_accumulation/age_" + id
+  ids.push(path)
+  bands.push(id)
+}
+
+
+for(var i = 1; i<=100; i++){
+  var id = i.toString()
+  ages.push(i)
+  ageIds.push(id)
+}
+
+var reducer = ee.Reducer.mean().combine(
+  ee.Reducer.stdDev(), null, true).combine(
+  ee.Reducer.percentile([5,95]), null, true).combine(
+    ee.Reducer.minMax(), null, true);
+  
+var agc_by_age = ee.ImageCollection(ids.map(function(id){
+  var collection = ee.ImageCollection(id);
+  var age = collection.first().get('age')
+  var mean = ee.Reducer.mean();
+  var image = collection.reduce(mean).set({age: age})
+  return image  
+})).toBands()
+.rename(bands)
+.updateMask(reforestation)
+.reduceRegion({
+  reducer: reducer,
+  geometry: gBounds,
+  scale: 100000,
+  crs:"EPSG:4326",
+  maxPixels: 1e11
+  })
+
+
+var aStats = a.reduceRegion({
+ reducer: reducer,
+  geometry: gBounds,
+  scale: 1000,
+  crs:"EPSG:4326",
+  maxPixels: 1e11
+})
+
+// print(aStats);
+var output = ee.FeatureCollection(
+  ee.Feature(null, agc_by_age)
+);
+
+var agFraction = ee.Image(100).subtract(rmf).multiply(0.01);
+
+mo = mo.multiply(agFraction);
+var max = a.addBands([mo, walker, biomes]).rename(['a', 'mo', 'walker', 'biome'])
+  .stratifiedSample({
+    numPoints: 1000,
+    classBand: 'biome',
+    region: gBounds,
+    scale: 1000,
+    projection: "EPSG:4326",
+    geometries: false
+  })
+
+// print(max)
+
+// Export.table.toDrive({
+//   collection: max,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "Global_A_Biomes"
+// })
+
+var dif = a.subtract(mo).divide(mo).multiply(100)
+var difStats = dif.reduceRegion({
+reducer: reducer,
+  geometry: gBounds,
+  scale: 1000,
+  crs:"EPSG:4326",
+  maxPixels: 1e11
+})
+
+
+// print(difStats)
+var m = 2/3;
+// var ages = ee.List.sequence(0, 100, 1);
+
+// var growth = calcCrEstimate(0, a, k, b, m).updateMask(reforestation);
+
+// var t0Stats = growth.reduceRegion({
+// reducer: reducer,
+//   geometry: gBounds,
+//   scale: 1000,
+//   crs:"EPSG:4326",
+//   maxPixels: 1e11
+// })
+
+// print(t0Stats)
+
+
+function calcCR(t, A, K, B, M){
+  var cr = ee.ImageCollection(t.map(function(age){
+    age = ee.Number(age).int();
+    var crEstimate = calcCrEstimate(age, A, K, B, M);
+    return crEstimate.set({'age':age});
+  }));
+  return cr;
+}
+
+
+function calcCrEstimate(t, a, k, b, m){
+  var cr = ee.Image().expression({
+    expression: "a * pow(1-(b*exp(-k*t)), 1/(1-m))",
+    map: {
+      "t": t,
+      "a": a,
+      "k": k,
+      "b": b,
+      "m": m,
+      "e": Math.E
+    }
+  }).float();
+  return cr;
+}
+
+
+var agc95 = a.multiply(0.95);
+
+// Map.addLayer(agc95)
+// Map.addLayer(a)
+
+var cr = ee.ImageCollection(ages.map(function(age){
+  age = ee.Number(age).int();
+  var nullImage = ee.Image(0).selfMask().rename('actual');
+  // var mean = linear.filter(ee.Filter.eq('age', age));
+  // var t = mean.size();
+  // var actual = ee.Image(
+  //   ee.Algorithms.If(t.eq(1), 
+  //   mean.first().select('mean').rename('actual'), 
+  //   nullImage));
+    
+  // var agc_max = ee.Image(amax).rename('max'); 
+  var age_image = ee.Image(age).rename('age').int();
+  var cr_estimate = calcCrEstimate(age, a, k, b, m);//
+  // var cr_prev = calcCrEstimate(age.subtract(1), a, k, b, m);
+  // var cr_post = calcCrEstimate(age.add(1), a, k, b, m);
+  // var rate = cr_post.subtract(cr_prev).divide(2).rename('r_1');
+  // var rate2 = cr_estimate.divide(age).rename('r_2');
+  var test = age_image.updateMask(cr_estimate.gte(agc95).selfMask())
+  // return cr_estimate//.addBands([rate, age])
+  //   // .rename(['agc', 'age'])
+  //   .float()
+  //   .set({age: age});
+  return test
+})).min().updateMask(reforestation);
+
+
+var ratesIC = ee.ImageCollection(ages.map(function(age){
+  age = ee.Number(age).int();
+  var age_image = ee.Image(age).rename('age').int();
+  var cr_estimate = calcCrEstimate(age, a, k, b, m);//
+  var cr_prev = calcCrEstimate(age.subtract(1), a, k, b, m);
+  var cr_post = calcCrEstimate(age.add(1), a, k, b, m);
+  var rate = cr_post.subtract(cr_prev).divide(2).rename('rate');
+  // var rate2 = cr_estimate.divide(age).rename('r_2');
+  // var test = age_image.updateMask(cr_estimate.gte(agc95).selfMask())
+  return rate.updateMask(reforestation)
+})).toBands().rename(ageIds)
+
+
+
+var ecoregionMedianRate = ee.FeatureCollection(ee.List(ratesIC.addBands(ecoregions).reduceRegion({
+    reducer: ee.Reducer.median().repeat(100).group(100),
+    geometry: gBounds,
+    scale: 100000,
+    crs: 'EPSG:4326',
+    maxPixels: 1e11,
+  }).get('groups')).map(function(item){
+    item = ee.Dictionary(item);
+    var ecoid = item.get('group');
+    var medians = ee.List(item.get('median'));
+    var median = ee.FeatureCollection(ages.map(function(age){
+      var index = ee.Number(age).subtract(1);
+      var value = medians.get(index);
+      return ee.Feature(null, {'id': ecoid, 'median_rate': value, 'age': age})
+    }))
+    return median
+  })).flatten()//.first()
+  
+var biomeMedianRate = ee.FeatureCollection(ee.List(ratesIC.addBands(biomes).reduceRegion({
+    reducer: ee.Reducer.median().repeat(100).group(100),
+    geometry: gBounds,
+    scale: 1000,
+    crs: 'EPSG:4326',
+    maxPixels: 1e11,
+  }).get('groups')).map(function(item){
+    item = ee.Dictionary(item);
+    var ecoid = item.get('group');
+    var medians = ee.List(item.get('median'));
+    var median = ee.FeatureCollection(ages.map(function(age){
+      var index = ee.Number(age).subtract(1);
+      var value = medians.get(index);
+      return ee.Feature(null, {'id': ecoid, 'median_rate': value, 'age': age})
+    }))
+    return median
+  })).flatten()//.first()
+
+
+// Export.table.toDrive({
+//   collection: ecoregionMedianRate,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "ecoregion_median_rates"
+// })
+// Export.table.toDrive({
+//   collection: biomeMedianRate,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "biome_median_rates"
+// })
+
+var ratesFC = ee.FeatureCollection(ages.map(function(age){
+  age = ee.Number(age).int();
+  var age_image = ee.Image(age).rename('age').int();
+  var cr_estimate = calcCrEstimate(age, a, k, b, m);//
+  var cr_prev = calcCrEstimate(age.subtract(1), a, k, b, m);
+  var cr_post = calcCrEstimate(age.add(1), a, k, b, m);
+  var rate = cr_post.subtract(cr_prev).divide(2).rename('r_1')
+  .updateMask(reforestation);
+  var globalMedianRate = rate.reduceRegion({
+    reducer: ee.Reducer.median(),
+    geometry: gBounds,
+    scale: 1000,
+    crs: 'EPSG:4326',
+    maxPixels: 1e11,
+    
+  })
+  return ee.Feature(null, globalMedianRate).set({'age': age});
+}))
+
+
+
+var maxRate = ee.ImageCollection(ages.map(function(age){
+  age = ee.Number(age).int();
+  var age_image = ee.Image(age).rename('age').int();
+  var cr_estimate = calcCrEstimate(age, a, k, b, m);//
+  var cr_prev = calcCrEstimate(age.subtract(1), a, k, b, m);
+  var cr_post = calcCrEstimate(age.add(1), a, k, b, m);
+  var rate = cr_post.subtract(cr_prev).divide(2).rename('rate');
+  // var rate2 = cr_estimate.divide(age).rename('r_2');
+  // var test = age_image.updateMask(cr_estimate.gte(agc95).selfMask())
+  return rate.addBands(age_image).updateMask(reforestation)
+})).qualityMosaic('rate');
+
+maxRate = maxRate.addBands(biomes.updateMask(maxRate.select(0))).addBands(ecoregions.updateMask(maxRate.select(0)))
+  
+// Map.addLayer(ecoregions)
+// Map.addLayer(maxRate)
+
+
+// var reducer = ee.Reducer.minMax()
+//   .combine(ee.Reducer.percentile([5,50,95]), null,true)
+//   .combine(ee.Reducer.mean(), null, true)
+//   .combine(ee.Reducer.stdDev(), null, true)
+  
+// var ageRateStatsER = ee.FeatureCollection(ee.List(maxRate.reduceRegion({
+//   reducer: reducer.repeat(3).group(3),
+//   scale: 1000,
+//   crs: 'EPSG:4326',
+//   geometry: gBounds,
+//   maxPixels: 1e11
+// }).get('groups')).map(function(item){
+//     item = ee.Dictionary(item);
+//     var ecoid = item.get('group');
+//     var mean = ee.List(item.get('mean'));
+//     var median = ee.List(item.get('p50'));
+//     var p5 = ee.List(item.get('p5'));
+//     var p95 = ee.List(item.get('p95'));
+//     var max = ee.List(item.get('max'));
+//     var min = ee.List(item.get('min'));
+//     var stdDev = ee.List(item.get('stdDev'));
+    
+//     return ee.Feature(null, {
+//       'eco_id': ecoid,
+//       'biome_id': median.get(2),
+//       'mean_rate': mean.get(0),
+//       'mean_age': mean.get(1),
+//       'median_rate': median.get(0),
+//       'median_age': median.get(1),
+//       'p5_rate': p5.get(0),
+//       'p5_age': p5.get(1),
+//       'p95_rate': p95.get(0),
+//       'p95_age': p95.get(1),
+//       'min_rate': min.get(0),
+//       'min_age': min.get(1),
+//       'max_rate': max.get(0),
+//       'max_age': max.get(1),
+//       'stdDev_rate': stdDev.get(0),
+//       'sdtDev_age': stdDev.get(1),
+      
+//     });
+//   }))
+// var output = ee.FeatureCollection(
+//   ee.Feature(null, ageMinMax))
+// print(ageRateStatsER)
+// Export.table.toDrive({
+//   collection: ageRateStatsER,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "max_rate_age_stats_er"
+// })
+
+// var zero = cr.filter(ee.Filter.eq('age', 0)).first()
+
+// var age95Stats = cr.reduceRegion({
+//   reducer: reducer,
+//   geometry: gBounds,
+//   scale: 1000,
+//   crs:"EPSG:4326",
+//   maxPixels: 1e11
+// })
+// age95Stats = ee.FeatureCollection(
+//   ee.Feature(null, age95Stats))
+
+// var age95Biome = cr.addBands([biomes]).rename(['age95', 'biome'])
+//   .stratifiedSample({
+//     numPoints: 1000,
+//     classBand: 'biome',
+//     region: gBounds,
+//     scale: 1000,
+//     projection: "EPSG:4326",
+//     geometries: false
+//   })
+
+// print(max)
+
+// Export.table.toDrive({
+//   collection: age95Biome,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "age_to_95_biome"
+// })
+
+// Export.table.toDrive({
+//   collection: age95Stats,
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: "age_to_95_global"
+// })
+// print(age95Stats)
+
+
+var ratesThroughTime = ee.ImageCollection(ages.map(function(age){
+  age = ee.Number(age).int();
+  var age_image = ee.Image(age).rename('age').int();
+  var cr_estimate = calcCrEstimate(age, a, k, b, m);//
+  var cr_prev = calcCrEstimate(age.subtract(1), a, k, b, m);
+  var cr_post = calcCrEstimate(age.add(1), a, k, b, m);
+  var rate = cr_post.subtract(cr_prev).divide(2).rename('rate');
+  // var rate2 = cr_estimate.divide(age).rename('r_2');
+  // var test = age_image.updateMask(cr_estimate.gte(agc95).selfMask())
+  return rate.set({'age': age});
+}));
+
+var lt5 = ratesThroughTime.filter(ee.Filter.lte('age',5))
+  .sum();
+var lt15 = ratesThroughTime.filter(ee.Filter.lte('age',15))
+  .sum();
+  
+var lt20 = ratesThroughTime.filter(ee.Filter.lte('age',20))
+  .sum();
+
+var lt25 = ratesThroughTime.filter(ee.Filter.lte('age',25))
+  .sum();
+  
+var lt20_45 = ratesThroughTime.filter(ee.Filter.and(ee.Filter.gte('age',20), ee.Filter.lte('age', 45)))
+  .sum();
+  
+var area = ee.Image.pixelArea().multiply(0.0001)
+
+
+var potential = lt5.addBands([lt15, lt20, lt25, lt20_45])
+  .rename('5years','15years', '20years', '25years', '20_45_years')
+  .multiply(area)
+  .addBands(area)
+  .updateMask(reforestation)
+  // .updateMask(cp_pot)
+
+var y25 = potential.select('25years');
+var y25_y40 = potential.select('20_45_years');
+
+var test = y25_y40.subtract(y25)
+  .divide(y25).multiply(100).addBands([biomes,ecoregions])
+
+var reducer = ee.Reducer.minMax()
+  .combine(ee.Reducer.percentile([5,50,95]), null,true)
+  .combine(ee.Reducer.mean(), null, true)
+  .combine(ee.Reducer.stdDev(), null, true)
+  // 
+var potentialER =ee.FeatureCollection(ee.List(test.reduceRegion({
+  reducer: reducer.repeat(2).group(2),
+  scale: 1000,
+  crs: 'EPSG:4326',
+  geometry: gBounds,
+  maxPixels: 1e11
+}).get('groups')).map(function(item){
+    item = ee.Dictionary(item);
+    var ecoid = item.get('group');
+    var mean = ee.List(item.get('mean'));
+    var median = ee.List(item.get('p50'));
+    var p5 = ee.List(item.get('p5'));
+    var p95 = ee.List(item.get('p95'));
+    var max = ee.List(item.get('max'));
+    var min = ee.List(item.get('min'));
+    var stdDev = ee.List(item.get('stdDev'));
+    
+    return ee.Feature(null, {
+      'eco_id': ecoid,
+      'biome_id': median.get(1),
+      'mean_diff': mean.get(0),
+      'median_diff': median.get(0),
+      'p5_diff': p5.get(0),
+      'p95_diff': p95.get(0),
+      'min_diff': min.get(0),
+      'max_diff': max.get(0),
+      'stdDev_diff': stdDev.get(0),
+    });
+  }))
+print(potentialER)
+
+Export.table.toDrive({
+  collection: potentialER,
+  folder: "Carbon_Accumulation",
+  fileNamePrefix: "carbon_diff_20_er"
+})
+
+
+// Map.addLayer(test, {min:-75, max: 75, palette: [
+//   '#543005',
+//   '#8c510a',
+//   '#bf812d',
+//   '#dfc27d',
+//   '#f6e8c3',
+//   '#f5f5f5',
+//   '#c7eae5',
+//   '#80cdc1',
+//   '#35978f',
+//   '#01665e',
+//   '#003c30']
+// });
+
+// Export.image.toDrive({
+//   image: test.updateMask(reforestation),
+//   folder: "Carbon_Accumulation",
+//   fileNamePrefix: 'accumulation_percent_diff_25',
+//   description: 'accumulation_percent_diff_25',
+//   scale: scale.getInfo(),
+//   crs: 'EPSG:4326',
+//   maxPixels: 1e13,
+//   region: gBounds
+// })
+
+// Map.addLayer(y25)
+// Map.addLayer(y25_y40)
+
+// potential = potential.reduceRegion({
+//     reducer: ee.Reducer.sum(),
+//     scale: 1000,
+//     crs: 'EPSG:4326',
+//     geometry: gBounds,
+//     maxPixels: 1e11
+// });
+
+// // Map.addLayer(potential)
+// potential = ee.FeatureCollection(
+//   ee.Feature(null, potential))
+
+
+// // Export.table.toDrive({
+// //   collection: potential,
+// //   folder: "Carbon_Accumulation",
+// //   fileNamePrefix: "global_potential_forest_griscom"
+// // })
+
+
+// var test = area.updateMask(cp_pot).reduceRegion({
+//   reducer: ee.Reducer.sum(),
+//     scale: 1000,
+//     crs: 'EPSG:4326',
+//     geometry: gBounds,
+//     maxPixels: 1e11
+// });
+
+
+
+// var lt5 = ratesThroughTime.filter(ee.Filter.lte('age',5))
+//   .sum();
+// var lt8_13 = ratesThroughTime.filter(ee.Filter.and(ee.Filter.gte('age',20), ee.Filter.lte('age', 25)))
+//   .sum();
+  
+// var costaRica = countries.filterBounds(geometry).geometry()
+// var amzPotential = lt5.addBands([lt8_13])
+//   .rename('5years','8years')
+//   // .multiply(area)
+//   // .addBands(area)
+//   .updateMask(forestBiomes).reduceRegion({
+//     reducer: ee.Reducer.mean(),
+//     scale: 1000,
+//     crs: 'EPSG:4326',
+//     geometry: costaRica,
+//     maxPixels: 1e11
+// });
+
+// print(amzPotential)
+//   // .updateMask(cp_pot)
+
+
