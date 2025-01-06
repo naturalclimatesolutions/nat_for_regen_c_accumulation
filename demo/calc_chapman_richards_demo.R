@@ -68,7 +68,7 @@ input_dir <-
 output_dir <-
   paste(working_dir, "/outputs/", outputs, sep = "")
 
-
+print(output_dir)
 # ------------------------------------------------------------------------------
 # Defined Functions
 # ------------------------------------------------------------------------------
@@ -152,16 +152,13 @@ fit_nls <-
     return(output)
   }
 
+
 # Function to calculate cr curve for each pixel within a set grid denoted by ID
 calc_cr <- function(id) {
-  # # Sets up progress logging
-  # log_freq <- 5
-  # last_logged_perc <- 0
 
   # Vector of ages
   ages <- seq(5, 100, by = 5)
   age_ch <- as.character(ages)
-
 
   # Runs input file function based on ID
   input_files <- get_input_files(id, age_ch)
@@ -170,7 +167,7 @@ calc_cr <- function(id) {
   agc_data <- rast(input_files$agc_files)
   max_pot <- rast(input_files$max_pot_file)
   valid_pixels <- rast(input_files$valid_pixels_file)
-
+  
   # Converts raster objects to vectors
   agc_vals <- values(agc_data)
   max_pot_vals <- values(max_pot)
@@ -336,19 +333,6 @@ calc_cr <- function(id) {
     b_error_rast[j] <- B_error
     cnv_rast[j] <- cnv_val
 
-    # Log progress in progress file
-    # current_perc <- (j / n_pixels) * 100
-    # if (current_perc - last_logged_perc >= log_freq) {
-    #   cat(
-    #     sprintf("Grid ID %s: %d%% Complete\n", id, round(current_perc)),
-    #     file = log_file,
-    #     append = TRUE
-    #   )
-    #   last_logged_perc <-
-    #     current_perc # Update the last logged percentage
-    # }
-# 
-    # Progress text bar - not used in parallelization
     setTxtProgressBar(pb, j)
   }
 
@@ -368,7 +352,7 @@ calc_cr <- function(id) {
   k_e_name <- file.path(output_dir, "K_error", k_e_name, fsep = "/")
   b_e_name <- file.path(output_dir, "B_error", b_e_name, fsep = "/")
   cnv_name <- file.path(output_dir, "convergence", cnv_name, fsep = "/")
-
+ 
   # Write results to file
   writeRaster(a_rast, a_name, gdal = c("COMPRESS=DEFLATE"))
   writeRaster(k_rast, k_name, gdal = c("COMPRESS=DEFLATE"))
@@ -378,97 +362,10 @@ calc_cr <- function(id) {
   writeRaster(b_error_rast, b_e_name, gdal = c("COMPRESS=DEFLATE"))
   writeRaster(cnv_rast, cnv_name, gdal = c("COMPRESS=DEFLATE"))
 
-  # # Update progress file with completed message for a grid
-  # log_entry <- sprintf("Grid ID %s: Processing Complete\n", id)
-  # write(log_entry, file = log_file, append = TRUE)
 }
-
 
 # -------------------------------------------------------------------------
 # Running calculations
 # -------------------------------------------------------------------------
-
 calc_cr(79)
 
-# # Get's list of input IDs
-# inputs <- list.files(paste(input_dir, "/agc_valid", sep = ""))
-# grid_ids <- regmatches(inputs, regexpr("\\d+", inputs))
-# 
-# # Get's list of completed IDs
-# completed <- list.files(paste(output_dir, "/A", sep = ""))
-# completed_grids <-
-#   unique(regmatches(completed, regexpr("\\d+", completed)))
-# 
-# # Returns list of un-run IDs
-# to_do <- setdiff(grid_ids, completed_grids)
-# length(to_do)
-# 
-# to_do_valid <- vector()
-# 
-# # Test for any valid pixels in inputs
-# for (i in 1:length(to_do)) {
-#   id <- to_do[i]
-#   valid_pixels_name <-
-#     paste(input_dir,
-#       "/agc_valid/valid_agc_",
-#       id_prefix,
-#       id,
-#       ".tif",
-#       sep = ""
-#     )
-#   rast <- rast(valid_pixels_name)
-#   setMinMax(rast)
-#   test <- minmax(rast, compute = FALSE)[2, 1]
-#   if (test == 1) {
-#     to_do_valid[i] <- id
-#   }
-# }
-# 
-# # Returns lists of valid un-run IDs
-# to_do_valid <- to_do_valid[!is.na(to_do_valid)]
-# length(to_do_valid)
-# to_do_valid
-# 
-# # Subset IDs to run
-# start_grid <- 79
-# end_grid <- 79
-# g_ids <- to_do_valid[start_grid:end_grid]
-# 
-# # Add running IDs to Log File
-# grid_log <- sprintf("Grids: %s", g_ids)
-# write(grid_log, file = log_file, append = TRUE)
-# 
-# # Register cores for Parallelization
-# cl <- makeCluster(1)
-# registerDoParallel(cl)
-# 
-# # Export functions to each cluster
-# clusterExport(
-#   cl,
-#   list(
-#     "calc_cr",
-#     "inputs",
-#     "outputs",
-#     "id_prefix",
-#     "input_dir",
-#     "output_dir",
-#     "chapman_richards",
-#     "get_input_files",
-#     "fit_nls",
-#     "log_file"
-#   )
-# )
-# clusterEvalQ(cl, library("terra"))
-# 
-# # Run CR function over each grid - distributing to job to an available core
-# # tic() and toc() registers time elapsed between the two calls
-# tic()
-# foreach(id = g_ids, .packages = c("terra")) %dopar% {
-#   calc_cr(id)
-# }
-# toc()
-# 
-# # Close cluster, remove session variables, and run garbage collector
-# parallel::stopCluster(cl = cl)
-# rm(list = ls(all.names = TRUE))
-# gc()
