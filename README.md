@@ -1,5 +1,5 @@
 # Carbon Accumulation Curves from Natural Forest Regneration 
-
+[![DOI](https://zenodo.org/badge/748392120.svg)](https://doi.org/10.5281/zenodo.15078012)
 - [Carbon Accumulation Curves from Natural Forest Regneration](#carbon-accumulation-curves-from-natural-forest-regneration)
   - [Overview](#overview)
   - [System Requirements](#system-requirements)
