@@ -1,0 +1,45 @@
+﻿ecozone,continent,biome,label,forest,growth_primary,growth_secondary_greater_20,growth_secondary_less_20,ecozone_continent
+Boreal coniferous forest,Asia,Boreal,Asia conifer,1,1.1,1.1,1.1,Asia Boreal coniferous
+Boreal coniferous forest,Europe,Boreal,Europe conifer,2,1.1,1.1,1.1,Europe Boreal coniferous
+Boreal coniferous forest,North America,Boreal,NA conifer,3,1.1,1.1,1.1,NA Boreal coniferous
+Boreal mountain system,Asia,Boreal,Asia boreal mountain,4,1.3,1.3,1.05,Asia Boreal mountain system
+Boreal mountain system,Europe,Boreal,Europe boreal mountain,5,1.3,1.3,1.05,Europe Boreal mountain system
+Boreal mountain system,North America,Boreal,NA boreal mountain,6,1.3,1.3,1.05,NA Boreal mountain system
+Temperate continental forest,Europe,Temperate,Europe continental,7,1.97,1.97,1.96,Europe Temperate continental
+Temperate continental forest,North America,Temperate,NA continental,8,1.97,1.97,1.96,NA Temperate continental
+Temperate mountain system,Europe,Temperate,Europe mountain,9,2.09,2.09,1.38,Europe Temperate mountain system
+Temperate mountain system,North America,Temperate,NA mountain,10,2.09,2.09,1.38,NA Temperate mountain system
+Temperate mountain system,South America,Temperate,SA mountain,11,2.09,2.09,1.38,SA Temperate mountain system
+Temperate oceanic forest,Europe,Temperate,Europe oceanic,12,2.3,2.3,2.3,Europe Temperate oceanic
+Temperate oceanic forest,North America,Temperate,NA oceanic,13,4.94,4.94,3.5,NA Temperate oceanic
+Temperate oceanic forest,South America,Temperate,SA oceanic,14,4.94,4.94,3.5,SA Temperate oceanic
+Subtropical dry forest,Africa,Subtropical,Africa subtropical dry,15,1.8,1.8,2.4,Africa Subtropical dry
+Subtropical dry forest,Europe,Subtropical,Europe subtropical dry,16,1,1,4,Europe Subtropical dry
+Subtropical dry forest,North America,Subtropical,NA subtropical dry,17,1,1,4,NA Subtropical dry
+Subtropical dry forest,South America,Subtropical,SA subtropical dry,18,1,1,4,SA Subtropical dry
+Subtropical dry forest,Asia,Subtropical,Asia subtropical dry,19,1.5,1.5,6,Asia Subtropical dry
+Subtropical humid forest,Africa,Subtropical,Africa humid,20,1,1,2.5,Africa Subtropical humid
+Subtropical humid forest,Asia,Subtropical,Asia humid,21,1,1,2.5,Asia Subtropical humid
+Subtropical humid forest,North America,Subtropical,NA humid,22,1,1,2.5,NA Subtropical humid
+Subtropical humid forest,South America,Subtropical,SA humid,23,1,1,2.5,SA Subtropical humid
+Subtropical mountain system,Africa,Subtropical,Africa subtropical mountain,24,0.5,0.5,2.5,Africa Subtropical mountain system
+Subtropical mountain system,Asia,Subtropical,Asia subtropical mountain,25,0.5,0.5,2.5,Asia Subtropical mountain system
+Subtropical mountain system,Europe,Subtropical,Europe subtropical mountain,26,0.5,0.5,2.5,Europe Subtropical mountain system
+Subtropical mountain system,North America,Subtropical,NA subtropical mountain,27,0.5,0.5,2.5,NA Subtropical mountain system
+Subtropical mountain system,South America,Subtropical,SA subtropical mountain,28,0.5,0.5,2.5,SA Subtropical mountain system
+Tropical dry forest,Africa,Tropical,Africa tropical dry,29,1.6,1.6,3.9,Africa Tropical dry
+Tropical dry forest,Asia,Tropical,Asia tropical dry,30,1.6,1.6,3.9,Asia Tropical dry
+Tropical dry forest,North America,Tropical,NA tropical dry,31,1.6,1.6,3.9,NA Tropical dry
+Tropical dry forest,South America,Tropical,SA tropical dry,32,1.6,1.6,3.9,SA Tropical dry
+Tropical moist deciduous forest,Asia,Tropical,Asia moist,33,0.4,0.9,2.4,Asia Tropical moist
+Tropical moist deciduous forest,Africa,Tropical,Africa moist,34,0.4,0.9,2.9,Africa Tropical moist
+Tropical moist deciduous forest,North America,Tropical,NA moist,35,0.4,2.7,5.2,NA Tropical moist
+Tropical moist deciduous forest,South America,Tropical,SA moist,36,0.4,2.7,5.2,SA Tropical moist
+Tropical mountain system,Asia,Tropical,Asia tropical mountain,37,-0.7,1.1,2.9,Asia Tropical mountain system
+Tropical mountain system,North America,Tropical,NA tropical mountain,38,0.5,1.8,4.4,NA Tropical mountain system
+Tropical mountain system,South America,Tropical,SA tropical mountain,39,0.5,1.8,4.4,SA Tropical mountain system
+Tropical mountain system,Africa,Tropical,Africa tropical mountain,40,0.5,1.8,5.5,Africa Tropical mountain system
+Tropical rainforest,Asia,Tropical,Asia rainforest,41,0.7,2.7,3.4,Asia Tropical rainforest
+Tropical rainforest,North America,Tropical,NA rainforest,42,1,2.3,5.9,NA Tropical rainforest
+Tropical rainforest,South America,Tropical,SA rainforest,43,1,2.3,5.9,SA Tropical rainforest
+Tropical rainforest,Africa,Tropical,Africa rainforest,44,1.3,3.5,7.6,Africa Tropical rainforest
